@@ -1,0 +1,15 @@
+image: fedora:33
+
+compile:
+        tags: 
+                - Normal
+        script:
+                - dnf -y install make gcc libtool which git capnproto-devel
+                - ./bootstrap
+                - ./configure --enable-tapascojtag
+                - make
+                - make install
+        artifacts:
+                paths:
+                        - src/openocd
+                        - src/libopen*
