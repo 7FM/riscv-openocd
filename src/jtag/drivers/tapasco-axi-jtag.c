@@ -318,7 +318,7 @@ static int axi_jtag_execute_scan(struct jtag_command *cmd)
 
     // Status is constantly probed
     if (addr != 0x11 && addr != 0x0) {
-        LOG_INFO("TAPASCO: DMI: op: %x, data: %x addr: %x tdo: %llx",
+        LOG_INFO("TAPASCO: DMI: op: %x, data: %x addr: %x tdo: %" PRIx64,
             op, data, addr, tdo);
     }
 
