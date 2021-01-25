@@ -12,10 +12,14 @@ compile:
                 - ./configure
                 - make install
                 - cd ..
+                - cp c-capnproto/.libs/libcapnp_c.la src/jtag/drivers/
+                - mkdir -p src/jtag/drivers/.libs/
+                - cp c-capnproto/.libs/libcapnp_c.so src/jtag/drivers/.libs/
                 - ./bootstrap
                 - ./configure --enable-tapascojtag
                 - make
                 - make install
+                - openocd --version
         artifacts:
                 paths:
                         - src/openocd
