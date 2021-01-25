@@ -46,8 +46,8 @@
 
 struct axi_jtag {
 	int fd;
-	void *io_base;
-	void *io_vaddr;
+	unsigned int *io_base;
+	unsigned int *io_vaddr;
 	off_t offset;
 
 	char *device_node;
