@@ -151,6 +151,9 @@ m4_define([LIBJAYLINK_ADAPTERS],
 m4_define([PCIE_ADAPTERS],
 	[[[xlnx_pcie_xvc], [Xilinx XVC/PCIe], [XLNX_PCIE_XVC]]])
 
+m4_define([MMIO_ADAPTERS],
+    [[[tapscojtag], [TaPaSCo JTAG], [TAPASCOJTAG]]])
+
 
 AC_ARG_ENABLE([doxygen-html],
   AS_HELP_STRING([--disable-doxygen-html],
@@ -251,6 +254,7 @@ AC_ARG_ADAPTERS([
   LIBFTDI_ADAPTERS,
   LIBGPIOD_ADAPTERS,
   LIBJAYLINK_ADAPTERS
+  MMIO_ADAPTERS
   ],[auto])
 
 AC_ARG_ENABLE([parport],
@@ -328,6 +332,19 @@ AC_ARG_ENABLE([oocd_trace],
   AS_HELP_STRING([--enable-oocd_trace],
   [Enable building support for some prototype OpenOCD+trace ETM capture hardware]),
   [build_oocd_trace=$enableval], [build_oocd_trace=no])
+
+
+AC_ARG_ENABLE([tapascojtag],
+  AS_HELP_STRING([--enable-tapascojtag], [Enable building support for the TaPaSCo JTAG driver]),
+  [build_tapascojtag=$enableval], [build_tapascojtag=no])
+
+AS_CASE([$host_os],
+  [linux*], [],
+  [
+    AS_IF([test "x$build_tapascojtag" = "xyes"], [
+      AC_MSG_ERROR([tapscojtag is only available on linux])
+    ])
+])
 
 AC_ARG_ENABLE([buspirate],
   AS_HELP_STRING([--enable-buspirate], [Enable building support for the Buspirate]),
@@ -602,6 +619,12 @@ AS_IF([test "x$build_oocd_trace" = "xyes"], [
   AC_DEFINE([BUILD_OOCD_TRACE], [0], [0 if you don't want the OpenOCD+trace ETM capture driver.])
 ])
 
+AS_IF([test "x$build_tapascojtag" = "xyes"], [
+  AC_DEFINE([BUILD_TAPASCOJTAG], [1], [1 if you want the TaPaSCo JTAG driver.])
+], [
+  AC_DEFINE([BUILD_TAPASCOJTAG], [0], [0 if you don't want the TaPaSCo JTAG driver.])
+])
+
 AS_IF([test "x$build_buspirate" = "xyes"], [
   AC_DEFINE([BUILD_BUSPIRATE], [1], [1 if you want the Buspirate JTAG driver.])
 ], [
@@ -755,6 +778,7 @@ AS_IF([test "x$enable_presto" != "xno"], [
 AM_CONDITIONAL([RELEASE], [test "x$build_release" = "xyes"])
 AM_CONDITIONAL([PARPORT], [test "x$build_parport" = "xyes"])
 AM_CONDITIONAL([DUMMY], [test "x$build_dummy" = "xyes"])
+AM_CONDITIONAL([AXIJTAG], [test "x$build_tapascojtag" = "xyes"])
 AM_CONDITIONAL([GIVEIO], [test "x$parport_use_giveio" = "xyes"])
 AM_CONDITIONAL([EP93XX], [test "x$build_ep93xx" = "xyes"])
 AM_CONDITIONAL([ZY1000], [test "x$build_zy1000" = "xyes"])
@@ -857,7 +881,7 @@ echo --------------------------------------------------
 m4_foreach([adapter], [USB1_ADAPTERS, USB0_ADAPTERS,
 	HIDAPI_ADAPTERS, HIDAPI_USB1_ADAPTERS, LIBFTDI_ADAPTERS,
 	LIBGPIOD_ADAPTERS,
-	LIBJAYLINK_ADAPTERS, PCIE_ADAPTERS],
+	LIBJAYLINK_ADAPTERS, PCIE_ADAPTERS, MMIO_ADAPTERS],
 	[s=m4_format(["%-40s"], ADAPTER_DESC([adapter]))
 	AS_CASE([$ADAPTER_VAR([adapter])],
 		[auto], [

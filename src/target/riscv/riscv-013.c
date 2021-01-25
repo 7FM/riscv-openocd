@@ -2661,7 +2661,7 @@ static int read_memory_bus_v1(struct target *target, target_addr_t address,
 		sbcs_write |= sb_sbaccess(size);
 		if (increment == size)
 			sbcs_write = set_field(sbcs_write, DM_SBCS_SBAUTOINCREMENT, 1);
-		if (count > 1)
+		if (count > 1 && false && "Fixes bug in Piccolo core")
 			sbcs_write = set_field(sbcs_write, DM_SBCS_SBREADONDATA, count > 1);
 		if (dmi_write(target, DM_SBCS, sbcs_write) != ERROR_OK)
 			return ERROR_FAIL;
@@ -2686,6 +2686,9 @@ static int read_memory_bus_v1(struct target *target, target_addr_t address,
 		target_addr_t next_read = address - 1;
 		for (uint32_t i = (next_address - address) / size; i < count - 1; i++) {
 			for (int j = (size - 1) / 4; j >= 0; j--) {
+                // TODO When increment is not working (e.g. on Piccolo core)
+                if (sb_write_address(target, next_read, true) != ERROR_OK)
+                    return ERROR_FAIL;
 				uint32_t value;
 				unsigned attempt = 0;
 				while (1) {

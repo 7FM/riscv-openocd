@@ -107,6 +107,9 @@ extern struct adapter_driver armjtagew_adapter_driver;
 #if BUILD_BUSPIRATE == 1
 extern struct adapter_driver buspirate_adapter_driver;
 #endif
+#if BUILD_TAPASCOJTAG == 1
+extern struct adapter_driver tapasco_jtag_interface;
+#endif
 #if BUILD_REMOTE_BITBANG == 1
 extern struct adapter_driver remote_bitbang_adapter_driver;
 #endif
@@ -226,6 +229,9 @@ struct adapter_driver *adapter_drivers[] = {
 #endif
 #if BUILD_BUSPIRATE == 1
 		&buspirate_adapter_driver,
+#endif
+#if BUILD_TAPASCOJTAG == 1
+        &tapasco_jtag_interface,
 #endif
 #if BUILD_REMOTE_BITBANG == 1
 		&remote_bitbang_adapter_driver,

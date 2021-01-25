@@ -131,6 +131,12 @@ DRIVERFILES += %D%/versaloon/usbtoxxx/usbtoxxx.c
 DRIVERFILES += %D%/versaloon/versaloon.c
 DRIVERFILES += %D%/vsllink.c
 endif
+if AXIJTAG
+DRIVERFILES += %D%/tapasco-axi-jtag.c
+DRIVERFILES += %D%/tapasco-riscv.capnp.c
+# Requires to build the lib and copy the .so file to .lib
+%C%_libocdjtagdrivers_la_LIBADD += %D%/libcapnp_c.la
+endif
 if ARMJTAGEW
 DRIVERFILES += %D%/arm-jtag-ew.c
 endif
