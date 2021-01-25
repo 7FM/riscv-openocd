@@ -4,7 +4,14 @@ compile:
         tags: 
                 - Normal
         script:
-                - dnf -y install make gcc libtool which git capnproto-devel
+                - dnf -y install make gcc libtool which git
+                - git clone https://github.com/opensourcerouting/c-capnproto
+                - cd c-capnproto
+                - git submodule update --init --recursive
+                - autoreconf -f -i -s
+                - ./configure
+                - make install
+                - cd ..
                 - ./bootstrap
                 - ./configure --enable-tapascojtag
                 - make
