@@ -286,8 +286,8 @@ static int axi_jtag_execute_scan(struct jtag_command *cmd)
                 if (addr == 0x38) {
                     // Do not show that system bus access is possible
                     // Current SweRV does not support it
-                    //tdo = 0x0;
-                    //break;
+                    tdo = 0x0;
+                    break;
                 }
                 if (op == 0b01) {
                     axi_jtag_write_reg(TAP_DMI_ADDR, addr);
