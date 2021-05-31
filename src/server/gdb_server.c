@@ -726,7 +726,7 @@ static void gdb_signal_reply(struct target *target, struct connection *connectio
 {
 	struct gdb_connection *gdb_connection = connection->priv;
 	char sig_reply[65];
-	char stop_reason[20];
+	char stop_reason[32];
 	char current_thread[25];
 	int sig_reply_len;
 	int signal_var;
@@ -1318,7 +1318,7 @@ static int gdb_get_register_packet(struct connection *connection,
 
 	if (reg_list_size <= reg_num) {
 		LOG_ERROR("gdb requested a non-existing register");
-		return ERROR_SERVER_REMOTE_CLOSED;
+		return gdb_error(connection, retval);
 	}
 
 	if (!reg_list[reg_num]->valid) {
@@ -2635,6 +2635,7 @@ static int gdb_query_packet(struct connection *connection,
 			cmd = malloc((packet_size - 6) / 2 + 1);
 			size_t len = unhexify((uint8_t *)cmd, packet + 6, (packet_size - 6) / 2);
 			cmd[len] = 0;
+			LOG_DEBUG("qRcmd: %s", cmd);
 
 			/* We want to print all debug output to GDB connection */
 			log_add_callback(gdb_log_callback, connection);
@@ -2941,6 +2942,7 @@ static bool gdb_handle_vcont_packet(struct connection *connection, const char *p
 				char sig_reply[128];
 
 				LOG_DEBUG("fake step thread %"PRIx64, thread_id);
+				target->rtos->current_threadid = thread_id;
 
 				sig_reply_len = snprintf(sig_reply, sizeof(sig_reply),
 										 "T05thread:%016"PRIx64";", thread_id);
@@ -3615,7 +3617,7 @@ static int gdb_target_start(struct target *target, const char *port)
 
 	ret = add_service("gdb",
 			port, target->gdb_max_connections, &gdb_new_connection, &gdb_input,
-			&gdb_connection_closed, gdb_service, NULL);
+			&gdb_connection_closed, gdb_service);
 	/* initialize all targets gdb service with the same pointer */
 	{
 		struct target_list *head;

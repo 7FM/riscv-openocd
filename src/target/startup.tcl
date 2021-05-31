@@ -179,12 +179,6 @@ proc using_hla {} {
 
 #########
 
-# Temporary migration aid.  May be removed starting in January 2011.
-proc armv4_5 params {
-	echo "DEPRECATED! use 'arm $params' not 'armv4_5 $params'"
-	arm $params
-}
-
 # Target/chain configuration scripts can either execute commands directly
 # or define a procedure which is executed once all configuration
 # scripts have completed.
@@ -213,13 +207,33 @@ proc init_target_events {} {
 proc init_board {} {
 }
 
-# deprecated target name cmds
-proc cortex_m3 args {
-	echo "DEPRECATED! use 'cortex_m' not 'cortex_m3'"
-	eval cortex_m $args
+# smp_on/smp_off were already DEPRECATED in v0.11.0 through http://openocd.zylin.com/4615
+proc "aarch64 smp_on" {args} {
+	echo "DEPRECATED! use 'aarch64 smp on' not 'aarch64 smp_on'"
+	eval aarch64 smp on $args
 }
 
-proc cortex_a8 args {
-	echo "DEPRECATED! use 'cortex_a' not 'cortex_a8'"
-	eval cortex_a $args
+proc "aarch64 smp_off" {args} {
+	echo "DEPRECATED! use 'aarch64 smp off' not 'aarch64 smp_off'"
+	eval aarch64 smp off $args
+}
+
+proc "cortex_a smp_on" {args} {
+	echo "DEPRECATED! use 'cortex_a smp on' not 'cortex_a smp_on'"
+	eval cortex_a smp on $args
+}
+
+proc "cortex_a smp_off" {args} {
+	echo "DEPRECATED! use 'cortex_a smp off' not 'cortex_a smp_off'"
+	eval cortex_a smp off $args
+}
+
+proc "mips_m4k smp_on" {args} {
+	echo "DEPRECATED! use 'mips_m4k smp on' not 'mips_m4k smp_on'"
+	eval mips_m4k smp on $args
+}
+
+proc "mips_m4k smp_off" {args} {
+	echo "DEPRECATED! use 'mips_m4k smp off' not 'mips_m4k smp_off'"
+	eval mips_m4k smp off $args
 }

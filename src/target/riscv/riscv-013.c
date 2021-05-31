@@ -85,8 +85,6 @@ void read_memory_sba_simple(struct target *target, target_addr_t addr,
 #define get_field(reg, mask) (((reg) & (mask)) / ((mask) & ~((mask) << 1)))
 #define set_field(reg, mask, val) (((reg) & ~(mask)) | (((val) * ((mask) & ~((mask) << 1))) & (mask)))
 
-#define DIM(x)		(sizeof(x)/sizeof(*x))
-
 #define CSR_DCSR_CAUSE_SWBP		1
 #define CSR_DCSR_CAUSE_TRIGGER	2
 #define CSR_DCSR_CAUSE_DEBUGINT	3
@@ -361,7 +359,7 @@ static void decode_dmi(char *text, unsigned address, unsigned data)
 	};
 
 	text[0] = 0;
-	for (unsigned i = 0; i < DIM(description); i++) {
+	for (unsigned i = 0; i < ARRAY_SIZE(description); i++) {
 		if (description[i].address == address) {
 			uint64_t mask = description[i].mask;
 			unsigned value = get_field(data, mask);
@@ -550,13 +548,15 @@ static dmi_status_t dmi_scan(struct target *target, uint32_t *address_in,
 }
 
 /**
+ * @param target
  * @param data_in  The data we received from the target.
- * @param dmi_op   The operation to perform (read/write/nop).
  * @param dmi_busy_encountered
  *                 If non-NULL, will be updated to reflect whether DMI busy was
  *                 encountered while executing this operation or not.
+ * @param dmi_op   The operation to perform (read/write/nop).
  * @param address  The address argument to that operation.
  * @param data_out The data to send to the target.
+ * @param timeout_sec
  * @param exec     When true, this scan will execute something, so extra RTI
  *                 cycles may be added.
  * @param ensure_success
@@ -693,7 +693,7 @@ int dmstatus_read_timeout(struct target *target, uint32_t *dmstatus,
 		return result;
 	int dmstatus_version = get_field(*dmstatus, DM_DMSTATUS_VERSION);
 	if (dmstatus_version != 2 && dmstatus_version != 3) {
-		LOG_ERROR("OpenOCD only supports Debug Module version 2 (0.13) and 3 (0.14), not "
+		LOG_ERROR("OpenOCD only supports Debug Module version 2 (0.13) and 3 (1.0), not "
 				"%d (dmstatus=0x%x). This error might be caused by a JTAG "
 				"signal issue. Try reducing the JTAG clock speed.",
 				get_field(*dmstatus, DM_DMSTATUS_VERSION), *dmstatus);
@@ -1307,6 +1307,8 @@ static int register_write_direct(struct target *target, unsigned number,
 	LOG_DEBUG("{%d} %s <- 0x%" PRIx64, riscv_current_hartid(target),
 			gdb_regno_name(number), value);
 
+	keep_alive();
+
 	int result = register_write_abstract(target, number, value,
 			register_size(target, number));
 	if (result == ERROR_OK || !has_sufficient_progbuf(target, 2) ||
@@ -1500,7 +1502,7 @@ static int register_read_direct(struct target *target, uint64_t *value, uint32_t
 	return result;
 }
 
-int wait_for_authbusy(struct target *target, uint32_t *dmstatus)
+static int wait_for_authbusy(struct target *target, uint32_t *dmstatus)
 {
 	time_t start = time(NULL);
 	while (1) {
@@ -1784,16 +1786,26 @@ static int examine(struct target *target)
 	return ERROR_OK;
 }
 
-int riscv013_authdata_read(struct target *target, uint32_t *value)
+static int riscv013_authdata_read(struct target *target, uint32_t *value, unsigned index)
 {
+	if (index > 0) {
+		LOG_ERROR("Spec 0.13 only has a single authdata register.");
+		return ERROR_FAIL;
+	}
+
 	if (wait_for_authbusy(target, NULL) != ERROR_OK)
 		return ERROR_FAIL;
 
 	return dmi_read(target, value, DM_AUTHDATA);
 }
 
-int riscv013_authdata_write(struct target *target, uint32_t value)
+static int riscv013_authdata_write(struct target *target, uint32_t value, unsigned index)
 {
+	if (index > 0) {
+		LOG_ERROR("Spec 0.13 only has a single authdata register.");
+		return ERROR_FAIL;
+	}
+
 	uint32_t before, after;
 	if (wait_for_authbusy(target, &before) != ERROR_OK)
 		return ERROR_FAIL;
@@ -1867,6 +1879,20 @@ static unsigned riscv013_data_bits(struct target *target)
 COMMAND_HELPER(riscv013_print_info, struct target *target)
 {
 	RISCV013_INFO(info);
+
+	/* Abstract description. */
+	riscv_print_info_line(CMD, "target", "memory.read_while_running8", get_field(info->sbcs, DM_SBCS_SBACCESS8));
+	riscv_print_info_line(CMD, "target", "memory.write_while_running8", get_field(info->sbcs, DM_SBCS_SBACCESS8));
+	riscv_print_info_line(CMD, "target", "memory.read_while_running16", get_field(info->sbcs, DM_SBCS_SBACCESS16));
+	riscv_print_info_line(CMD, "target", "memory.write_while_running16", get_field(info->sbcs, DM_SBCS_SBACCESS16));
+	riscv_print_info_line(CMD, "target", "memory.read_while_running32", get_field(info->sbcs, DM_SBCS_SBACCESS32));
+	riscv_print_info_line(CMD, "target", "memory.write_while_running32", get_field(info->sbcs, DM_SBCS_SBACCESS32));
+	riscv_print_info_line(CMD, "target", "memory.read_while_running64", get_field(info->sbcs, DM_SBCS_SBACCESS64));
+	riscv_print_info_line(CMD, "target", "memory.write_while_running64", get_field(info->sbcs, DM_SBCS_SBACCESS64));
+	riscv_print_info_line(CMD, "target", "memory.read_while_running128", get_field(info->sbcs, DM_SBCS_SBACCESS128));
+	riscv_print_info_line(CMD, "target", "memory.write_while_running128", get_field(info->sbcs, DM_SBCS_SBACCESS128));
+
+	/* Lower level description. */
 	riscv_print_info_line(CMD, "dm", "abits", info->abits);
 	riscv_print_info_line(CMD, "dm", "progbufsize", info->progbufsize);
 	riscv_print_info_line(CMD, "dm", "sbversion", get_field(info->sbcs, DM_SBCS_SBVERSION));
@@ -1876,6 +1902,10 @@ COMMAND_HELPER(riscv013_print_info, struct target *target)
 	riscv_print_info_line(CMD, "dm", "sbaccess32", get_field(info->sbcs, DM_SBCS_SBACCESS32));
 	riscv_print_info_line(CMD, "dm", "sbaccess16", get_field(info->sbcs, DM_SBCS_SBACCESS16));
 	riscv_print_info_line(CMD, "dm", "sbaccess8", get_field(info->sbcs, DM_SBCS_SBACCESS8));
+
+	uint32_t dmstatus;
+	if (dmstatus_read(target, &dmstatus, false) == ERROR_OK)
+		riscv_print_info_line(CMD, "dm", "authenticated", get_field(dmstatus, DM_DMSTATUS_AUTHENTICATED));
 
 	return 0;
 }
@@ -1929,6 +1959,9 @@ static int riscv013_get_register_buf(struct target *target,
 		uint8_t *value, int regno)
 {
 	assert(regno >= GDB_REGNO_V0 && regno <= GDB_REGNO_V31);
+
+	if (riscv_select_current_hart(target) != ERROR_OK)
+		return ERROR_FAIL;
 
 	riscv_reg_t s0;
 	if (register_read(target, &s0, GDB_REGNO_S0) != ERROR_OK)
@@ -1985,6 +2018,9 @@ static int riscv013_set_register_buf(struct target *target,
 		int regno, const uint8_t *value)
 {
 	assert(regno >= GDB_REGNO_V0 && regno <= GDB_REGNO_V31);
+
+	if (riscv_select_current_hart(target) != ERROR_OK)
+		return ERROR_FAIL;
 
 	riscv_reg_t s0;
 	if (register_read(target, &s0, GDB_REGNO_S0) != ERROR_OK)
@@ -2123,7 +2159,7 @@ static int sample_memory_bus_v1(struct target *target,
 	const unsigned repeat = 5;
 
 	unsigned enabled_count = 0;
-	for (unsigned i = 0; i < DIM(config->bucket); i++) {
+	for (unsigned i = 0; i < ARRAY_SIZE(config->bucket); i++) {
 		if (config->bucket[i].enabled)
 			enabled_count++;
 	}
@@ -2140,7 +2176,7 @@ static int sample_memory_bus_v1(struct target *target,
 
 		unsigned result_bytes = 0;
 		for (unsigned n = 0; n < repeat; n++) {
-			for (unsigned i = 0; i < DIM(config->bucket); i++) {
+			for (unsigned i = 0; i < ARRAY_SIZE(config->bucket); i++) {
 				if (config->bucket[i].enabled) {
 					if (!sba_supports_access(target, config->bucket[i].size_bytes)) {
 						LOG_ERROR("Hardware does not support SBA access for %d-byte memory sampling.",
@@ -2208,7 +2244,7 @@ static int sample_memory_bus_v1(struct target *target,
 
 		unsigned read = 0;
 		for (unsigned n = 0; n < repeat; n++) {
-			for (unsigned i = 0; i < DIM(config->bucket); i++) {
+			for (unsigned i = 0; i < ARRAY_SIZE(config->bucket); i++) {
 				if (config->bucket[i].enabled) {
 					assert(i < RISCV_SAMPLE_BUF_TIMESTAMP_BEFORE);
 					uint64_t value = 0;
@@ -2712,6 +2748,7 @@ static int read_memory_bus_v1(struct target *target, target_addr_t address,
 				}
 				next_read = address + i * size + j * 4;
 			}
+			keep_alive();
 		}
 
 		uint32_t sbcs_read = 0;
@@ -3682,54 +3719,76 @@ static int write_memory_bus_v1(struct target *target, target_addr_t address,
 			next_address += size;
 		}
 
+		/* Execute the batch of writes */
 		result = batch_run(target, batch);
 		riscv_batch_free(batch);
 		if (result != ERROR_OK)
 			return result;
 
+		/* Read sbcs value.
+		 * At the same time, detect if DMI busy has occurred during the batch write. */
 		bool dmi_busy_encountered;
 		if (dmi_op(target, &sbcs, &dmi_busy_encountered, DMI_OP_READ,
-				DM_SBCS, 0, false, false) != ERROR_OK)
+				DM_SBCS, 0, false, true) != ERROR_OK)
 			return ERROR_FAIL;
+		if (dmi_busy_encountered)
+			LOG_DEBUG("DMI busy encountered during system bus write.");
 
+		/* Wait until sbbusy goes low */
 		time_t start = time(NULL);
-		bool dmi_busy = dmi_busy_encountered;
-		while (get_field(sbcs, DM_SBCS_SBBUSY) || dmi_busy) {
+		while (get_field(sbcs, DM_SBCS_SBBUSY)) {
 			if (time(NULL) - start > riscv_command_timeout_sec) {
 				LOG_ERROR("Timed out after %ds waiting for sbbusy to go low (sbcs=0x%x). "
-					  "Increase the timeout with riscv set_command_timeout_sec.",
-					  riscv_command_timeout_sec, sbcs);
+						  "Increase the timeout with riscv set_command_timeout_sec.",
+						  riscv_command_timeout_sec, sbcs);
 				return ERROR_FAIL;
 			}
-
-			if (dmi_op(target, &sbcs, &dmi_busy, DMI_OP_READ,
-						DM_SBCS, 0, false, true) != ERROR_OK)
+			if (dmi_read(target, &sbcs, DM_SBCS) != ERROR_OK)
 				return ERROR_FAIL;
 		}
 
 		if (get_field(sbcs, DM_SBCS_SBBUSYERROR)) {
-			/* We wrote while the target was busy. Slow down and try again. */
+			/* We wrote while the target was busy. */
+			LOG_DEBUG("Sbbusyerror encountered during system bus write.");
+			/* Clear the sticky error flag. */
 			dmi_write(target, DM_SBCS, sbcs | DM_SBCS_SBBUSYERROR);
+			/* Slow down before trying again. */
 			info->bus_master_write_delay += info->bus_master_write_delay / 10 + 1;
 		}
 
 		if (get_field(sbcs, DM_SBCS_SBBUSYERROR) || dmi_busy_encountered) {
+			/* Recover from the case when the write commands were issued too fast.
+			 * Determine the address from which to resume writing. */
 			next_address = sb_read_address(target);
 			if (next_address < address) {
 				/* This should never happen, probably buggy hardware. */
-				LOG_DEBUG("unexpected system bus address 0x%" TARGET_PRIxADDR,
-					  next_address);
+				LOG_DEBUG("unexpected sbaddress=0x%" TARGET_PRIxADDR
+						  " - buggy sbautoincrement in hw?", next_address);
+				/* Fail the whole operation. */
 				return ERROR_FAIL;
 			}
-
+			/* Try again - resume writing. */
 			continue;
 		}
 
-		unsigned error = get_field(sbcs, DM_SBCS_SBERROR);
-		if (error != 0) {
-			/* Some error indicating the bus access failed, but not because of
-			 * something we did wrong. */
+		unsigned sberror = get_field(sbcs, DM_SBCS_SBERROR);
+		if (sberror != 0) {
+			/* Sberror indicates the bus access failed, but not because we issued the writes
+			 * too fast. Cannot recover. Sbaddress holds the address where the error occurred
+			 * (unless sbautoincrement in the HW is buggy).
+			 */
+			target_addr_t sbaddress = sb_read_address(target);
+			LOG_DEBUG("System bus access failed with sberror=%u (sbaddress=0x%" TARGET_PRIxADDR ")",
+					  sberror, sbaddress);
+			if (sbaddress < address) {
+				/* This should never happen, probably buggy hardware.
+				 * Make a note to the user not to trust the sbaddress value. */
+				LOG_DEBUG("unexpected sbaddress=0x%" TARGET_PRIxADDR
+						  " - buggy sbautoincrement in hw?", next_address);
+			}
+			/* Clear the sticky error flag */
 			dmi_write(target, DM_SBCS, DM_SBCS_SBERROR);
+			/* Fail the whole operation */
 			return ERROR_FAIL;
 		}
 	}
@@ -4021,7 +4080,8 @@ static int riscv013_get_register(struct target *target,
 	LOG_DEBUG("[%s] reading register %s", target_name(target),
 			gdb_regno_name(rid));
 
-	riscv_select_current_hart(target);
+	if (riscv_select_current_hart(target) != ERROR_OK)
+		return ERROR_FAIL;
 
 	int result = ERROR_OK;
 	if (rid == GDB_REGNO_PC) {
