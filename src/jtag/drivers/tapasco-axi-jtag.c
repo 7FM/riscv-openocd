@@ -65,6 +65,7 @@ static struct tapasco_intf tapasco_intf_state;
 static struct tapasco_intf *tapasco_intf = &tapasco_intf_state;
 
 static uint32_t current_ir_reg = IDCODE;
+static uint32_t current_addr = -1;
 
 /**
  * Read DTM reg
@@ -270,7 +271,7 @@ static int axi_jtag_execute_scan(struct jtag_command *cmd)
             case IDCODE:
                 axi_jtag_read_reg(TAP_IDCODE, &tdo);
                 break;
-            case DTMCS: 
+            case DTMCS:
                 axi_jtag_read_reg(TAP_DTMCS, &tdo);
                 break;
             case DMI: 
@@ -282,6 +283,11 @@ static int axi_jtag_execute_scan(struct jtag_command *cmd)
                     (cmd->cmd.scan->fields->out_value[4] << 30);
                 addr = (cmd->cmd.scan->fields->out_value[4] >> 2);
                 op = cmd->cmd.scan->fields->out_value[0] & 0b11;
+
+                if (addr == 0x0 && op == 0x0 && data == 0x0) {
+                    LOG_INFO("TAPASCO: DMI: skip strange request!");
+                    break;
+                }
 
                 if (addr == 0x38) {
                     // Do not show that system bus access is possible
@@ -299,13 +305,23 @@ static int axi_jtag_execute_scan(struct jtag_command *cmd)
                     axi_jtag_write_reg(TAP_DMI_ADDR, addr);
                     axi_jtag_write_reg(TAP_DMI_DATA, data);
                 } else {
+                    if (current_addr != addr) {
+                        // Ensure that the address is set to not trigger undesired burst transfers
+                        axi_jtag_write_reg(TAP_DMI_ADDR, addr);
+                        LOG_INFO("TAPASCO: DMI: required forced addr change!");
+                    }
                     // With ensure_success flag the dmi reg is read twice once with NOP
                     error_code = axi_jtag_read_reg(TAP_DMI_DATA, &tdo);
                     tdo = tdo << 2;
                 }
+                current_addr = addr;
                 break;
             default: tdo = 0xDEADBEEF;
         }
+        // Status is constantly probed
+        //if (addr != 0x11 && addr != 0x0) {
+        LOG_INFO("TAPASCO: DMI: op: %x, data: %x addr: %x tdo: %" PRIx64, op, data, addr, tdo);
+        //}
     } else if (ir_scan) {
         // Fake the IR scan for OpenOCD, is not supported
         tdo = 0x181;
@@ -314,12 +330,6 @@ static int axi_jtag_execute_scan(struct jtag_command *cmd)
     if (error_code != ERROR_OK) {
         LOG_ERROR("Got error during DMI action!\n");
         return error_code;
-    }
-
-    // Status is constantly probed
-    if (addr != 0x11 && addr != 0x0) {
-        LOG_INFO("TAPASCO: DMI: op: %x, data: %x addr: %x tdo: %" PRIx64,
-            op, data, addr, tdo);
     }
 
 	buf_set_u64(rd_ptr, 0, 64, tdo);
@@ -342,9 +352,11 @@ static int axi_jtag_execute_command(struct jtag_command *cmd)
         }
 	    case JTAG_RESET:
             // TODO maybe try to do reset here
-		    break;
+            LOG_INFO("JTAG_RESET not implemented!");
+            break;
 	    case JTAG_TLR_RESET:
             // TODO maybe try to do reset here
+            LOG_INFO("JTAG_TLR_RESET not implemented!");
             break;
 	    default:
 		    LOG_ERROR("BUG: Unknown JTAG command type encountered: %u", cmd->type);
