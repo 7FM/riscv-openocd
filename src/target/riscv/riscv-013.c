@@ -2851,6 +2851,14 @@ static bool mem_should_skip_progbuf(struct target *target, target_addr_t address
 		return true;
 	}
 
+	if (read) {
+		// Write bursts work, so just skip read bursts
+		LOG_INFO("Skipping mem %s via progbuf - as bursts are somewhat broken with SCR1.",
+				read ? "read" : "write");
+		*skip_reason = "Read bursts seem to be broken with SCR1";
+		return true;
+	}
+
 	return false;
 }
 
