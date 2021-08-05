@@ -3528,7 +3528,17 @@ static int read_memory(struct target *target, target_addr_t address,
 			if (mem_should_skip_progbuf(target, address, size, true, &progbuf_result))
 				continue;
 
-			ret = read_memory_progbuf(target, address, size, count, buffer, increment);
+			ret = ERROR_OK;
+
+			if (count > 1) {
+				LOG_ERROR("WARNING: replace BURST READ with single reads! Size: %d Count: %d Inc: %d Addr: 0x%" PRIx64, size, count, increment, address);
+			}
+
+			for (; count > 0; --count) {
+				ret |= read_memory_progbuf(target, address, size, 1, buffer, increment);
+				address += increment;
+				buffer += size;
+			}
 
 			if (ret != ERROR_OK)
 				progbuf_result = "failed";
